@@ -27,8 +27,7 @@ stages:
         command: build
         dockerfile: 'Dockerfile'
         tags: |
-          v1.6
-          latest
+          v1.6.2.1
     - task: Docker@2
       displayName: pipeline push stage
       inputs:
@@ -37,5 +36,4 @@ stages:
         repository: 'wingsorg/cadd'
         command: push
         tags: |
-          v1.6
-          latest
+          v1.6.2.1

@@ -24,6 +24,20 @@ OUTFILE=""
 VERSION="v1.6"
 VERBOSE="-q"
 CORES="1"
+
+# set memory to available memory by default (can be lower than system memory in docker containers):
+#if [[ -f "/sys/fs/cgroup/memory/memory.limit_in_bytes" ]]; then
+#    MEMORY=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
+#    MEMORY=$((MEMORY / 1024 / 1024 / 1024))
+if [[ -f "/sys/fs/cgroup/memory.max" ]]; then
+    MEMORY=$(cat /sys/fs/cgroup/memory.max)
+    MEMORY=$((MEMORY / 1024 / 1024 / 1024))
+else
+    # if files are not available, determine in snakemake
+    MEMORY="0"
+fi
+
+
 while getopts ':ho:g:v:c:aqp' option; do
   case "$option" in
     h) echo "$usage"
@@ -35,7 +49,7 @@ while getopts ':ho:g:v:c:aqp' option; do
        ;;
     v) VERSION=$OPTARG
        ;;
-    v) CORES=$OPTARG
+    c) CORES=$OPTARG
        ;;
     a) ANNOTATION=true
        ;;
@@ -56,6 +70,17 @@ INFILE=$1
 echo "CADD-v1.6 (c) University of Washington, Hudson-Alpha Institute for Biotechnology and Berlin Institute of Health 2013-2020. All rights reserved."
 
 set -ueo pipefail
+
+# check if input file does exist
+if [ "$INFILE" == "" ]
+then
+    echo "No input file specified. To run CADD, a list of variants has to be provided in a vcf or vcf.gz file."
+    exit 1
+elif [ ! -f "$INFILE" ]
+then
+    echo "Input file $INFILE does not exist."
+    exit 1
+fi
 
 ### Configuring all the paths
 
@@ -101,7 +126,7 @@ fi
 # Setup temporary folder that is removed reliably on exit and is outside of
 # the CADD-scripts directory.
 TMP_FOLDER=$(mktemp -d)
-trap "rm -rf $TMP_FOLDER" ERR EXIT
+#trap "rm -rf $TMP_FOLDER" ERR EXIT
 
 # Temp files
 TMP_INFILE=$TMP_FOLDER/$NAME.$FILEFORMAT
@@ -110,9 +135,9 @@ TMP_OUTFILE=$TMP_FOLDER/$NAME.tsv.gz
 cp $INFILE $TMP_INFILE
 
 echo "Running snakemake pipeline:"
-echo snakemake $TMP_OUTFILE --use-conda --conda-prefix $CADD/envs --cores $CORES
+echo snakemake $TMP_OUTFILE --resources cpu_load=100 --config mem_gb=$MEMORY --use-conda --conda-prefix $CADD/envs --cores $CORES
 echo --configfile $CONFIG --snakefile $CADD/Snakefile $VERBOSE
-snakemake $TMP_OUTFILE --use-conda --conda-prefix $CADD/envs --cores $CORES \
+snakemake $TMP_OUTFILE --resources cpu_load=100 --config mem_gb=$MEMORY --use-conda --conda-prefix $CADD/envs --cores $CORES \
     --configfile $CONFIG --snakefile $CADD/Snakefile $VERBOSE
 
 mv $TMP_OUTFILE $OUTFILE
